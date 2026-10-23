@@ -1,0 +1,2089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Qixel - 16x16 Pixel Art Creator</title>
+	<style>
+		:root {
+			color-scheme: dark;
+			--bg: #11131a;
+			--panel: #1a1d26;
+			--panel-2: #232734;
+			--text: #eceff7;
+			--muted: #9ca5bf;
+			--border: #32384a;
+			--accent: #75a7ff;
+		}
+
+		* {
+			box-sizing: border-box;
+			font-family: Inter, Segoe UI, Arial, sans-serif;
+		}
+
+		body {
+			margin: 0;
+			background: var(--bg);
+			color: var(--text);
+			overflow: hidden;
+		}
+
+		.layout {
+			display: grid;
+			grid-template-columns: 1fr 390px;
+			min-height: 100vh;
+			gap: 16px;
+			padding: 16px;
+		}
+
+		.panel {
+			background: var(--panel);
+			border: 1px solid var(--border);
+			border-radius: 12px;
+			padding: 14px;
+		}
+
+		h1,
+		h2,
+		h3 {
+			margin: 0 0 10px;
+			font-weight: 600;
+		}
+
+		.editor-wrap {
+			display: grid;
+			grid-template-columns: auto 1fr;
+			gap: 16px;
+			align-items: start;
+		}
+
+		.canvas-stack {
+			display: flex;
+			flex-direction: column;
+			gap: 10px;
+		}
+
+		.canvas-wrap {
+			position: relative;
+			width: min(80vw, 640px);
+			max-width: 100%;
+		}
+
+		canvas {
+			width: 100%;
+			max-width: 100%;
+			aspect-ratio: 1 / 1;
+			border: 1px solid var(--border);
+			background-image:
+				linear-gradient(45deg, #2b2f3f 25%, transparent 25%),
+				linear-gradient(-45deg, #2b2f3f 25%, transparent 25%),
+				linear-gradient(45deg, transparent 75%, #2b2f3f 75%),
+				linear-gradient(-45deg, transparent 75%, #2b2f3f 75%);
+			background-size: 18px 18px;
+			background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+			image-rendering: pixelated;
+			cursor: crosshair;
+		}
+
+		.canvas-overlay {
+			position: absolute;
+			inset: 0;
+			pointer-events: none;
+			border-radius: 0;
+			background-repeat: repeat;
+		}
+
+		.controls,
+		.palette-controls {
+			display: grid;
+			gap: 10px;
+			background: var(--panel-2);
+			border: 1px solid var(--border);
+			border-radius: 10px;
+			padding: 10px;
+		}
+
+		.row {
+			display: flex;
+			gap: 8px;
+			flex-wrap: wrap;
+			align-items: center;
+		}
+
+		label {
+			font-size: 13px;
+			color: var(--muted);
+			display: grid;
+			gap: 5px;
+		}
+
+		input,
+		select,
+		button {
+			background: #111521;
+			color: var(--text);
+			border: 1px solid var(--border);
+			border-radius: 8px;
+			padding: 7px 9px;
+			font-size: 14px;
+		}
+
+		button {
+			cursor: pointer;
+			background: #1f2533;
+		}
+
+		button.primary {
+			background: var(--accent);
+			color: #081023;
+			border: none;
+			font-weight: 600;
+		}
+
+		.color-preview {
+			width: 48px;
+			height: 48px;
+			border-radius: 8px;
+			border: 1px solid var(--border);
+			background-image:
+				linear-gradient(45deg, #2b2f3f 25%, transparent 25%),
+				linear-gradient(-45deg, #2b2f3f 25%, transparent 25%),
+				linear-gradient(45deg, transparent 75%, #2b2f3f 75%),
+				linear-gradient(-45deg, transparent 75%, #2b2f3f 75%);
+			background-size: 12px 12px;
+			position: relative;
+			overflow: hidden;
+		}
+
+		.color-preview > span {
+			position: absolute;
+			inset: 0;
+			border-radius: inherit;
+		}
+
+		.right-column {
+			display: grid;
+			gap: 12px;
+			align-content: start;
+			min-height: 0;
+			height: calc(100vh - 32px);
+			overflow: hidden;
+		}
+
+		.palette-sidebar {
+			display: grid;
+			gap: 12px;
+			min-height: 0;
+			height: 100%;
+		}
+
+		.palette-list {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+			gap: 12px;
+			align-content: start;
+			align-items: start;
+			overflow-y: auto;
+			min-height: 0;
+			padding-right: 4px;
+		}
+
+		.palette-card {
+			border: 1px solid var(--border);
+			border-radius: 10px;
+			padding: 10px;
+			background: var(--panel-2);
+			display: grid;
+			gap: 8px;
+			min-width: 0;
+		}
+
+		.palette-card.selected {
+			outline: 2px solid var(--accent);
+			outline-offset: 1px;
+		}
+
+		.palette-card.compact {
+			max-width: 240px;
+		}
+
+		.palette-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			gap: 8px;
+		}
+
+		.palette-name {
+			margin: 0;
+			font-size: 15px;
+			font-weight: 600;
+		}
+
+		.palette-grid {
+			display: grid;
+			gap: 2px;
+			width: fit-content;
+			max-width: 100%;
+		}
+
+		.swatch {
+			width: min(100%, 22px);
+			height: min(22px, calc((100vw - 64px) / 18));
+			border: 1px solid rgba(255, 255, 255, 0.12);
+			border-radius: 2px;
+			cursor: pointer;
+			background-image:
+				linear-gradient(45deg, #2b2f3f 25%, transparent 25%),
+				linear-gradient(-45deg, #2b2f3f 25%, transparent 25%),
+				linear-gradient(45deg, transparent 75%, #2b2f3f 75%),
+				linear-gradient(-45deg, transparent 75%, #2b2f3f 75%);
+			background-size: 10px 10px;
+			position: relative;
+			overflow: hidden;
+		}
+
+		.swatch > span {
+			position: absolute;
+			inset: 0;
+		}
+
+		.swatch.active {
+			outline: 2px solid var(--accent);
+			outline-offset: 1px;
+		}
+
+		.pagination {
+			display: flex;
+			justify-content: center;
+			align-items: center;
+			gap: 8px;
+			color: var(--muted);
+			font-size: 13px;
+		}
+
+		.modal {
+			position: fixed;
+			inset: 0;
+			background: rgba(7, 9, 14, 0.72);
+			display: none;
+			align-items: center;
+			justify-content: center;
+			padding: 16px;
+			z-index: 40;
+		}
+
+		.modal.show {
+			display: flex;
+		}
+
+		.modal-content {
+			width: min(720px, 95vw);
+			background: var(--panel);
+			border: 1px solid var(--border);
+			border-radius: 12px;
+			padding: 14px;
+			display: grid;
+			gap: 12px;
+		}
+
+		.grid-2 {
+			display: grid;
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			gap: 10px;
+		}
+
+		.grid-3 {
+			display: grid;
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+			gap: 10px;
+		}
+
+		.frames-panel {
+			display: grid;
+			gap: 10px;
+			background: var(--panel-2);
+			border: 1px solid var(--border);
+			border-radius: 10px;
+			padding: 10px;
+			min-height: 0;
+		}
+
+		.frame-actions {
+			display: flex;
+			gap: 8px;
+			flex-wrap: wrap;
+		}
+
+		.frame-list {
+			display: grid;
+			grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+			gap: 8px;
+			max-height: 240px;
+			overflow-y: auto;
+			padding-right: 4px;
+			min-height: 0;
+		}
+
+		.frame-card {
+			display: grid;
+			gap: 6px;
+			padding: 8px;
+			text-align: left;
+		}
+
+		.frame-card.active {
+			outline: 2px solid var(--accent);
+		}
+
+		.frame-preview {
+			width: 100%;
+			aspect-ratio: 1 / 1;
+			border: 1px solid var(--border);
+			border-radius: 6px;
+			background-image:
+				linear-gradient(45deg, #2b2f3f 25%, transparent 25%),
+				linear-gradient(-45deg, #2b2f3f 25%, transparent 25%),
+				linear-gradient(45deg, transparent 75%, #2b2f3f 75%),
+				linear-gradient(-45deg, transparent 75%, #2b2f3f 75%);
+			background-size: 10px 10px;
+			image-rendering: pixelated;
+		}
+
+		.frame-name {
+			font-size: 13px;
+			font-weight: 600;
+		}
+
+		.small {
+			font-size: 12px;
+			color: var(--muted);
+		}
+
+		@media (max-width: 1120px) {
+			body {
+				overflow: auto;
+			}
+
+			.layout {
+				grid-template-columns: 1fr;
+			}
+
+			.editor-wrap {
+				grid-template-columns: 1fr;
+			}
+
+			.right-column {
+				height: auto;
+				overflow: visible;
+			}
+
+			.palette-sidebar {
+				height: auto;
+			}
+
+			.palette-list {
+				overflow: visible;
+			}
+		}
+	</style>
+</head>
+<body>
+	<div class="layout">
+		<section class="panel">
+			<h1>16x16 Pixel Art Creator</h1>
+			<div class="editor-wrap">
+				<div class="canvas-stack">
+					<div class="canvas-wrap">
+						<canvas id="pixelCanvas" width="16" height="16" aria-label="Pixel editor"></canvas>
+						<canvas id="tileCanvas" width="48" height="48" aria-label="Tiling editor" style="display: none;"></canvas>
+						<div id="canvasOverlay" class="canvas-overlay" aria-hidden="true"></div>
+					</div>
+					<div class="row">
+						<label>
+							Export format
+							<select id="exportFormat">
+								<option value="png">PNG</option>
+								<option value="jpeg">JPEG</option>
+							</select>
+						</label>
+						<label>
+							Superpixel size
+							<input id="exportScale" type="number" min="1" max="128" value="32" />
+						</label>
+						<button class="primary" id="exportBtn">Export image</button>
+					</div>
+				</div>
+
+				<div class="controls">
+					<h2>Current Brush Color</h2>
+					<div class="row">
+						<label>
+							Input mode
+							<select id="brushMode">
+								<option value="hsl">HSL</option>
+								<option value="rgb">RGB</option>
+							</select>
+						</label>
+						<div class="color-preview" title="Current color preview"><span id="brushPreview"></span></div>
+					</div>
+
+					<div id="brushHslInputs" class="row">
+						<label>Hue <input id="brushH" type="number" min="0" max="360" value="210" /></label>
+						<label>Saturation % <input id="brushS" type="number" min="0" max="100" value="70" /></label>
+						<label>Lightness % <input id="brushL" type="number" min="0" max="100" value="50" /></label>
+					</div>
+
+					<div id="brushRgbInputs" class="row" style="display: none;">
+						<label>R <input id="brushR" type="number" min="0" max="255" value="64" /></label>
+						<label>G <input id="brushG" type="number" min="0" max="255" value="128" /></label>
+						<label>B <input id="brushB" type="number" min="0" max="255" value="224" /></label>
+					</div>
+
+					<div class="row">
+						<label>Alpha (0 - 1) <input id="brushA" type="number" step="0.01" min="0" max="1" value="1" /></label>
+					</div>
+
+					<div class="row">
+						<label>
+							Brush type
+							<select id="brushType">
+								<option value="pencil">Pencil</option>
+								<option value="fill">Fill</option>
+								<option value="picker">Color picker</option>
+							</select>
+						</label>
+						<button id="shiftUpBtn" title="Shift image up by 1 pixel">↑</button>
+						<button id="shiftDownBtn" title="Shift image down by 1 pixel">↓</button>
+						<button id="shiftLeftBtn" title="Shift image left by 1 pixel">←</button>
+						<button id="shiftRightBtn" title="Shift image right by 1 pixel">→</button>
+					</div>
+
+					<div class="row">
+						<button id="overlayToggleBtn">Overlay: Off</button>
+						<div class="small">Cycles through off, pixel grid, guide lines, and tiling</div>
+					</div>
+
+					<div class="row">
+						<label>
+							<input id="highlightNotInAnyToggle" type="checkbox" />
+							Highlight colors not in any palette
+						</label>
+						<label>
+							<input id="highlightNotInSelectedToggle" type="checkbox" />
+							Highlight colors not in selected palette
+						</label>
+					</div>
+
+					<div class="frames-panel">
+						<h2>Frames</h2>
+						<div class="row">
+							<label>Width <input id="frameWidthInput" type="number" min="1" max="256" value="16" /></label>
+							<label>Height <input id="frameHeightInput" type="number" min="1" max="256" value="16" /></label>
+							<button id="importFrameBtn">Import frame image</button>
+							<input id="importFrameInput" type="file" accept="image/*" style="display: none;" />
+						</div>
+						<div class="frame-actions">
+							<button id="addFrameBtn" class="primary">New frame</button>
+							<button id="duplicateFrameBtn">Duplicate frame</button>
+							<button id="deleteFrameBtn">Delete frame</button>
+						</div>
+						<div id="frameList" class="frame-list"></div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<aside class="right-column">
+			<div class="palette-sidebar">
+			<section class="panel">
+				<h2>Palettes</h2>
+				<div class="palette-controls">
+					<div class="row">
+						<button id="addPaletteBtn" class="primary">Add palette</button>
+						<button id="editPaletteBtn">Edit palette</button>
+						<button id="deletePaletteBtn">Delete palette</button>
+						<button id="exportProjectBtn">Export info</button>
+						<button id="importProjectBtn">Import info</button>
+						<input id="importProjectInput" type="file" accept="application/json" style="display: none;" />
+					</div>
+					<div class="small">Hue = columns, lightness = rows, saturation = pages</div>
+				</div>
+			</section>
+			<section id="paletteList" class="palette-list"></section>
+			</div>
+		</aside>
+	</div>
+
+	<div id="paletteModal" class="modal" role="dialog" aria-modal="true" aria-label="Add palette">
+		<div class="modal-content">
+			<h3>Create Palette</h3>
+			<div class="grid-2">
+				<label>
+					Palette name
+					<input id="paletteName" type="text" placeholder="Palette 1" />
+				</label>
+				<label>
+					Base color mode
+					<select id="baseMode">
+						<option value="hsl">HSL</option>
+						<option value="rgb">RGB</option>
+					</select>
+				</label>
+			</div>
+
+			<div id="baseHslInputs" class="row">
+				<label>Base Hue <input id="baseH" type="number" min="0" max="360" value="210" /></label>
+				<label>Base Saturation % <input id="baseS" type="number" min="0" max="100" value="70" /></label>
+				<label>Base Lightness % <input id="baseL" type="number" min="0" max="100" value="50" /></label>
+			</div>
+
+			<div id="baseRgbInputs" class="row" style="display: none;">
+				<label>Base R <input id="baseR" type="number" min="0" max="255" value="64" /></label>
+				<label>Base G <input id="baseG" type="number" min="0" max="255" value="128" /></label>
+				<label>Base B <input id="baseB" type="number" min="0" max="255" value="224" /></label>
+			</div>
+
+			<div class="row">
+				<label>Base alpha (0 - 1) <input id="baseA" type="number" step="0.01" min="0" max="1" value="1" /></label>
+			</div>
+
+			<div class="grid-2">
+				<label>Angle (degrees) <input id="angle" type="number" min="0" max="360" value="30" /></label>
+				<label>Left iterations <input id="leftIterations" type="number" min="0" value="2" /></label>
+				<label>Right iterations <input id="rightIterations" type="number" min="0" value="2" /></label>
+				<label>Luminosity steps <input id="luminositySteps" type="number" min="0" value="1" /></label>
+				<label>Saturation steps <input id="saturationSteps" type="number" min="0" value="1" /></label>
+			</div>
+
+			<div class="grid-2">
+				<label>
+					Bend color mode
+					<select id="bendMode">
+						<option value="hsl">HSL</option>
+						<option value="rgb">RGB</option>
+					</select>
+				</label>
+				<div class="small">Custom blend targets for light, dark, and desaturation</div>
+			</div>
+
+			<div id="bendHslInputs" class="grid-3">
+				<label>Light H <input id="bendLightH" type="number" min="0" max="360" value="0" /></label>
+				<label>Light S % <input id="bendLightS" type="number" min="0" max="100" value="0" /></label>
+				<label>Light L % <input id="bendLightL" type="number" min="0" max="100" value="100" /></label>
+
+				<label>Dark H <input id="bendDarkH" type="number" min="0" max="360" value="0" /></label>
+				<label>Dark S % <input id="bendDarkS" type="number" min="0" max="100" value="0" /></label>
+				<label>Dark L % <input id="bendDarkL" type="number" min="0" max="100" value="0" /></label>
+
+				<label>Sat H <input id="bendSatH" type="number" min="0" max="360" value="0" /></label>
+				<label>Sat S % <input id="bendSatS" type="number" min="0" max="100" value="0" /></label>
+				<label>Sat L % <input id="bendSatL" type="number" min="0" max="100" value="50" /></label>
+			</div>
+
+			<div id="bendRgbInputs" class="grid-3" style="display: none;">
+				<label>Light R <input id="bendLightR" type="number" min="0" max="255" value="255" /></label>
+				<label>Light G <input id="bendLightG" type="number" min="0" max="255" value="255" /></label>
+				<label>Light B <input id="bendLightB" type="number" min="0" max="255" value="255" /></label>
+
+				<label>Dark R <input id="bendDarkR" type="number" min="0" max="255" value="0" /></label>
+				<label>Dark G <input id="bendDarkG" type="number" min="0" max="255" value="0" /></label>
+				<label>Dark B <input id="bendDarkB" type="number" min="0" max="255" value="0" /></label>
+
+				<label>Sat R <input id="bendSatR" type="number" min="0" max="255" value="128" /></label>
+				<label>Sat G <input id="bendSatG" type="number" min="0" max="255" value="128" /></label>
+				<label>Sat B <input id="bendSatB" type="number" min="0" max="255" value="128" /></label>
+			</div>
+
+			<div class="row">
+				<button id="cancelPaletteBtn">Cancel</button>
+				<button id="createPaletteBtn" class="primary">Create palette</button>
+			</div>
+		</div>
+	</div>
+
+	<script>
+		const canvas = document.getElementById('pixelCanvas');
+		const ctx = canvas.getContext('2d', { alpha: true });
+		ctx.imageSmoothingEnabled = false;
+		const tileCanvas = document.getElementById('tileCanvas');
+		const tileCtx = tileCanvas.getContext('2d', { alpha: true });
+		tileCtx.imageSmoothingEnabled = false;
+
+		const exportFormat = document.getElementById('exportFormat');
+		const exportScale = document.getElementById('exportScale');
+		const exportBtn = document.getElementById('exportBtn');
+		const canvasOverlay = document.getElementById('canvasOverlay');
+		const overlayToggleBtn = document.getElementById('overlayToggleBtn');
+
+		const addFrameBtn = document.getElementById('addFrameBtn');
+		const duplicateFrameBtn = document.getElementById('duplicateFrameBtn');
+		const deleteFrameBtn = document.getElementById('deleteFrameBtn');
+		const importFrameBtn = document.getElementById('importFrameBtn');
+		const importFrameInput = document.getElementById('importFrameInput');
+		const frameWidthInput = document.getElementById('frameWidthInput');
+		const frameHeightInput = document.getElementById('frameHeightInput');
+		const frameList = document.getElementById('frameList');
+
+		const brushMode = document.getElementById('brushMode');
+		const brushType = document.getElementById('brushType');
+		const shiftUpBtn = document.getElementById('shiftUpBtn');
+		const shiftDownBtn = document.getElementById('shiftDownBtn');
+		const shiftLeftBtn = document.getElementById('shiftLeftBtn');
+		const shiftRightBtn = document.getElementById('shiftRightBtn');
+		const brushHslInputs = document.getElementById('brushHslInputs');
+		const brushRgbInputs = document.getElementById('brushRgbInputs');
+		const brushPreview = document.getElementById('brushPreview');
+
+		const brushH = document.getElementById('brushH');
+		const brushS = document.getElementById('brushS');
+		const brushL = document.getElementById('brushL');
+		const brushR = document.getElementById('brushR');
+		const brushG = document.getElementById('brushG');
+		const brushB = document.getElementById('brushB');
+		const brushA = document.getElementById('brushA');
+		const highlightNotInAnyToggle = document.getElementById('highlightNotInAnyToggle');
+		const highlightNotInSelectedToggle = document.getElementById('highlightNotInSelectedToggle');
+
+		const addPaletteBtn = document.getElementById('addPaletteBtn');
+		const editPaletteBtn = document.getElementById('editPaletteBtn');
+		const deletePaletteBtn = document.getElementById('deletePaletteBtn');
+		const paletteModal = document.getElementById('paletteModal');
+		const cancelPaletteBtn = document.getElementById('cancelPaletteBtn');
+		const createPaletteBtn = document.getElementById('createPaletteBtn');
+		const paletteList = document.getElementById('paletteList');
+		const exportProjectBtn = document.getElementById('exportProjectBtn');
+		const importProjectBtn = document.getElementById('importProjectBtn');
+		const importProjectInput = document.getElementById('importProjectInput');
+
+		const paletteName = document.getElementById('paletteName');
+		const baseMode = document.getElementById('baseMode');
+		const baseHslInputs = document.getElementById('baseHslInputs');
+		const baseRgbInputs = document.getElementById('baseRgbInputs');
+
+		const baseH = document.getElementById('baseH');
+		const baseS = document.getElementById('baseS');
+		const baseL = document.getElementById('baseL');
+		const baseR = document.getElementById('baseR');
+		const baseG = document.getElementById('baseG');
+		const baseB = document.getElementById('baseB');
+		const baseA = document.getElementById('baseA');
+
+		const angleInput = document.getElementById('angle');
+		const leftIterationsInput = document.getElementById('leftIterations');
+		const rightIterationsInput = document.getElementById('rightIterations');
+		const luminosityStepsInput = document.getElementById('luminositySteps');
+		const saturationStepsInput = document.getElementById('saturationSteps');
+		const bendMode = document.getElementById('bendMode');
+		const bendHslInputs = document.getElementById('bendHslInputs');
+		const bendRgbInputs = document.getElementById('bendRgbInputs');
+		const bendLightH = document.getElementById('bendLightH');
+		const bendLightS = document.getElementById('bendLightS');
+		const bendLightL = document.getElementById('bendLightL');
+		const bendDarkH = document.getElementById('bendDarkH');
+		const bendDarkS = document.getElementById('bendDarkS');
+		const bendDarkL = document.getElementById('bendDarkL');
+		const bendSatH = document.getElementById('bendSatH');
+		const bendSatS = document.getElementById('bendSatS');
+		const bendSatL = document.getElementById('bendSatL');
+		const bendLightR = document.getElementById('bendLightR');
+		const bendLightG = document.getElementById('bendLightG');
+		const bendLightB = document.getElementById('bendLightB');
+		const bendDarkR = document.getElementById('bendDarkR');
+		const bendDarkG = document.getElementById('bendDarkG');
+		const bendDarkB = document.getElementById('bendDarkB');
+		const bendSatR = document.getElementById('bendSatR');
+		const bendSatG = document.getElementById('bendSatG');
+		const bendSatB = document.getElementById('bendSatB');
+
+		const DEFAULT_SIZE = 16;
+		let isPainting = false;
+		let lastPaintPoint = null;
+		let strokeSnapshot = null;
+		let activeColor = { r: 64, g: 128, b: 224, a: 1 };
+		let palettes = [];
+		let selectedPaletteId = null;
+		let editingPaletteId = null;
+		let overlayMode = 'off';
+		let frames = [createFrame('Frame 1', createEmptyPixels(DEFAULT_SIZE, DEFAULT_SIZE), DEFAULT_SIZE, DEFAULT_SIZE)];
+		let activeFrameIndex = 0;
+		const undoStack = [];
+		const MAX_UNDO_STEPS = 100;
+
+		function createEmptyPixels(width = DEFAULT_SIZE, height = DEFAULT_SIZE) {
+			const safeWidth = clamp(Math.floor(Number(width) || DEFAULT_SIZE), 1, 256);
+			const safeHeight = clamp(Math.floor(Number(height) || DEFAULT_SIZE), 1, 256);
+			return Array.from({ length: safeWidth * safeHeight }, () => ({ r: 0, g: 0, b: 0, a: 0 }));
+		}
+
+		function normalizePixels(pixels, width, height) {
+			const target = createEmptyPixels(width, height);
+			if (!Array.isArray(pixels)) return target;
+
+			for (let i = 0; i < target.length && i < pixels.length; i++) {
+				const source = pixels[i] || {};
+				target[i] = {
+					r: clamp(Number(source.r ?? 0), 0, 255),
+					g: clamp(Number(source.g ?? 0), 0, 255),
+					b: clamp(Number(source.b ?? 0), 0, 255),
+					a: clamp(Number(source.a ?? 0), 0, 1)
+				};
+			}
+
+			return target;
+		}
+
+		function createFrame(name, pixels = createEmptyPixels(DEFAULT_SIZE, DEFAULT_SIZE), width = DEFAULT_SIZE, height = DEFAULT_SIZE) {
+			const safeWidth = clamp(Math.floor(Number(width) || DEFAULT_SIZE), 1, 256);
+			const safeHeight = clamp(Math.floor(Number(height) || DEFAULT_SIZE), 1, 256);
+			return {
+				id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+				name,
+				width: safeWidth,
+				height: safeHeight,
+				pixels: normalizePixels(pixels, safeWidth, safeHeight)
+			};
+		}
+
+		function getCurrentFrame() {
+			return frames[activeFrameIndex];
+		}
+
+		function clamp(value, min, max) {
+			return Math.max(min, Math.min(max, value));
+		}
+
+		function modHue(deg) {
+			const value = deg % 360;
+			return value < 0 ? value + 360 : value;
+		}
+
+		function hslToRgb(h, s, l) {
+			const sat = clamp(s, 0, 100) / 100;
+			const light = clamp(l, 0, 100) / 100;
+			const hue = modHue(h) / 360;
+
+			if (sat === 0) {
+				const gray = Math.round(light * 255);
+				return { r: gray, g: gray, b: gray };
+			}
+
+			const q = light < 0.5 ? light * (1 + sat) : light + sat - light * sat;
+			const p = 2 * light - q;
+
+			const hueToChannel = (t) => {
+				let temp = t;
+				if (temp < 0) temp += 1;
+				if (temp > 1) temp -= 1;
+				if (temp < 1 / 6) return p + (q - p) * 6 * temp;
+				if (temp < 1 / 2) return q;
+				if (temp < 2 / 3) return p + (q - p) * (2 / 3 - temp) * 6;
+				return p;
+			};
+
+			return {
+				r: Math.round(hueToChannel(hue + 1 / 3) * 255),
+				g: Math.round(hueToChannel(hue) * 255),
+				b: Math.round(hueToChannel(hue - 1 / 3) * 255)
+			};
+		}
+
+		function rgbToHsl(r, g, b) {
+			const red = clamp(r, 0, 255) / 255;
+			const green = clamp(g, 0, 255) / 255;
+			const blue = clamp(b, 0, 255) / 255;
+
+			const max = Math.max(red, green, blue);
+			const min = Math.min(red, green, blue);
+			const delta = max - min;
+
+			let hue = 0;
+			if (delta !== 0) {
+				if (max === red) hue = ((green - blue) / delta) % 6;
+				else if (max === green) hue = (blue - red) / delta + 2;
+				else hue = (red - green) / delta + 4;
+				hue *= 60;
+			}
+
+			const lightness = (max + min) / 2;
+			const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
+
+			return {
+				h: modHue(hue),
+				s: Math.round(saturation * 100),
+				l: Math.round(lightness * 100)
+			};
+		}
+
+		function colorToCss(color) {
+			return `rgba(${color.r}, ${color.g}, ${color.b}, ${color.a})`;
+		}
+
+		function blendRgb(from, to, ratio) {
+			const t = clamp(ratio, 0, 1);
+			return {
+				r: Math.round(from.r + (to.r - from.r) * t),
+				g: Math.round(from.g + (to.g - from.g) * t),
+				b: Math.round(from.b + (to.b - from.b) * t)
+			};
+		}
+
+		function colorsEqual(a, b) {
+			return a.r === b.r && a.g === b.g && a.b === b.b && Math.abs(a.a - b.a) < 0.001;
+		}
+
+		function colorKey(color) {
+			return `${color.r}|${color.g}|${color.b}|${Math.round(clamp(color.a, 0, 1) * 1000)}`;
+		}
+
+		function clonePixels(source) {
+			return source.map((pixel) => ({ ...pixel }));
+		}
+
+		function hasPixelDifferences(a, b) {
+			if (!a || !b || a.length !== b.length) return true;
+			for (let i = 0; i < a.length; i++) {
+				if (!colorsEqual(a[i], b[i])) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		function updateBrushPreview() {
+			brushPreview.style.background = colorToCss(activeColor);
+		}
+
+		function syncBrushFromMode() {
+			if (brushMode.value === 'hsl') {
+				const rgb = hslToRgb(
+					Number(brushH.value),
+					Number(brushS.value),
+					Number(brushL.value)
+				);
+				activeColor = {
+					...rgb,
+					a: clamp(Number(brushA.value), 0, 1)
+				};
+			} else {
+				activeColor = {
+					r: clamp(Number(brushR.value), 0, 255),
+					g: clamp(Number(brushG.value), 0, 255),
+					b: clamp(Number(brushB.value), 0, 255),
+					a: clamp(Number(brushA.value), 0, 1)
+				};
+			}
+			updateBrushPreview();
+			renderPalettes();
+		}
+
+		function setBrushColor(color) {
+			activeColor = {
+				r: clamp(Math.round(color.r), 0, 255),
+				g: clamp(Math.round(color.g), 0, 255),
+				b: clamp(Math.round(color.b), 0, 255),
+				a: clamp(Number(color.a), 0, 1)
+			};
+
+			const hsl = rgbToHsl(activeColor.r, activeColor.g, activeColor.b);
+			brushH.value = Math.round(hsl.h);
+			brushS.value = hsl.s;
+			brushL.value = hsl.l;
+			brushR.value = activeColor.r;
+			brushG.value = activeColor.g;
+			brushB.value = activeColor.b;
+			brushA.value = activeColor.a;
+
+			updateBrushPreview();
+			renderPalettes();
+		}
+
+		function setModeVisibility(modeSelect, hslEl, rgbEl, hslDisplay = 'flex', rgbDisplay = 'flex') {
+			const isHsl = modeSelect.value === 'hsl';
+			hslEl.style.display = isHsl ? hslDisplay : 'none';
+			rgbEl.style.display = isHsl ? 'none' : rgbDisplay;
+		}
+
+		function buildPaletteColorSet(palette) {
+			const set = new Set();
+			for (let page = 0; page < palette.saturationPages.length; page++) {
+				for (let row = 0; row < palette.lightnessRows.length; row++) {
+					for (let col = 0; col < palette.hueColumns.length; col++) {
+						set.add(colorKey(paletteColor(palette, row, col, page)));
+					}
+				}
+			}
+			return set;
+		}
+
+		function getHighlightSets() {
+			const needsAny = highlightNotInAnyToggle.checked;
+			const needsSelected = highlightNotInSelectedToggle.checked;
+			if (!needsAny && !needsSelected) {
+				return null;
+			}
+
+			let anySet = null;
+			if (needsAny) {
+				anySet = new Set();
+				for (const palette of palettes) {
+					const paletteSet = buildPaletteColorSet(palette);
+					for (const key of paletteSet) {
+						anySet.add(key);
+					}
+				}
+			}
+
+			let selectedSet = null;
+			if (needsSelected) {
+				const selectedPalette = getSelectedPalette();
+				selectedSet = selectedPalette ? buildPaletteColorSet(selectedPalette) : new Set();
+			}
+
+			return {
+				anySet,
+				selectedSet,
+				needsAny,
+				needsSelected
+			};
+		}
+
+		function renderPaletteMismatchHighlights(currentPixels) {
+			const highlightSets = getHighlightSets();
+			if (!highlightSets) return;
+			const currentFrame = getCurrentFrame();
+			const frameWidth = currentFrame.width;
+			const frameHeight = currentFrame.height;
+
+			ctx.fillStyle = 'rgba(255, 0, 0, 0.45)';
+			tileCtx.fillStyle = 'rgba(255, 0, 0, 0.45)';
+
+			for (let y = 0; y < frameHeight; y++) {
+				for (let x = 0; x < frameWidth; x++) {
+					const color = currentPixels[y * frameWidth + x];
+					const key = colorKey(color);
+					const notInAny = highlightSets.needsAny && !highlightSets.anySet.has(key);
+					const notInSelected = highlightSets.needsSelected && !highlightSets.selectedSet.has(key);
+
+					if (!notInAny && !notInSelected) {
+						continue;
+					}
+
+					ctx.fillRect(x, y, 1, 1);
+					for (let ty = 0; ty < 3; ty++) {
+						for (let tx = 0; tx < 3; tx++) {
+							tileCtx.fillRect(tx * frameWidth + x, ty * frameHeight + y, 1, 1);
+						}
+					}
+				}
+			}
+		}
+
+		function renderCanvas() {
+			const currentFrame = getCurrentFrame();
+			const currentPixels = currentFrame.pixels;
+			const frameWidth = currentFrame.width;
+			const frameHeight = currentFrame.height;
+
+			if (canvas.width !== frameWidth || canvas.height !== frameHeight) {
+				canvas.width = frameWidth;
+				canvas.height = frameHeight;
+			}
+			if (tileCanvas.width !== frameWidth * 3 || tileCanvas.height !== frameHeight * 3) {
+				tileCanvas.width = frameWidth * 3;
+				tileCanvas.height = frameHeight * 3;
+			}
+			canvas.style.aspectRatio = `${frameWidth} / ${frameHeight}`;
+			tileCanvas.style.aspectRatio = `${frameWidth} / ${frameHeight}`;
+
+			ctx.clearRect(0, 0, frameWidth, frameHeight);
+			tileCtx.clearRect(0, 0, frameWidth * 3, frameHeight * 3);
+			for (let y = 0; y < frameHeight; y++) {
+				for (let x = 0; x < frameWidth; x++) {
+					const color = currentPixels[y * frameWidth + x];
+					if (color.a <= 0) continue;
+					ctx.fillStyle = colorToCss(color);
+					ctx.fillRect(x, y, 1, 1);
+					tileCtx.fillStyle = colorToCss(color);
+					for (let ty = 0; ty < 3; ty++) {
+						for (let tx = 0; tx < 3; tx++) {
+							tileCtx.fillRect(tx * frameWidth + x, ty * frameHeight + y, 1, 1);
+						}
+					}
+				}
+			}
+
+			renderPaletteMismatchHighlights(currentPixels);
+		}
+
+		function updateOverlay() {
+			if (overlayMode === 'grid') {
+				canvas.style.display = 'block';
+				tileCanvas.style.display = 'none';
+				canvasOverlay.style.display = 'block';
+				canvasOverlay.style.backgroundImage = [
+					'repeating-linear-gradient(to right, rgba(255,255,255,0.18) 0, rgba(255,255,255,0.18) 1px, transparent 1px, transparent calc(100% / 16))',
+					'repeating-linear-gradient(to bottom, rgba(255,255,255,0.18) 0, rgba(255,255,255,0.18) 1px, transparent 1px, transparent calc(100% / 16))'
+				].join(',');
+				overlayToggleBtn.textContent = 'Overlay: Grid';
+				return;
+			}
+
+			if (overlayMode === 'guides') {
+				canvas.style.display = 'block';
+				tileCanvas.style.display = 'none';
+				canvasOverlay.style.display = 'block';
+				canvasOverlay.style.backgroundImage = [
+					'linear-gradient(to right, transparent calc(25% - 1px), rgba(96, 255, 96, 0.85) calc(25% - 1px), rgba(96, 255, 96, 0.85) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255, 96, 96, 0.9) calc(50% - 1px), rgba(255, 96, 96, 0.9) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(96, 255, 96, 0.85) calc(75% - 1px), rgba(96, 255, 96, 0.85) calc(75% + 1px), transparent calc(75% + 1px))',
+					'linear-gradient(to bottom, transparent calc(25% - 1px), rgba(96, 255, 96, 0.85) calc(25% - 1px), rgba(96, 255, 96, 0.85) calc(25% + 1px), transparent calc(25% + 1px), transparent calc(50% - 1px), rgba(255, 96, 96, 0.9) calc(50% - 1px), rgba(255, 96, 96, 0.9) calc(50% + 1px), transparent calc(50% + 1px), transparent calc(75% - 1px), rgba(96, 255, 96, 0.85) calc(75% - 1px), rgba(96, 255, 96, 0.85) calc(75% + 1px), transparent calc(75% + 1px))'
+				].join(',');
+				overlayToggleBtn.textContent = 'Overlay: Guides';
+				return;
+			}
+
+			if (overlayMode === 'tiling') {
+				canvas.style.display = 'none';
+				tileCanvas.style.display = 'block';
+				canvasOverlay.style.display = 'none';
+				canvasOverlay.style.backgroundImage = 'none';
+				overlayToggleBtn.textContent = 'Overlay: Tiling';
+				return;
+			}
+
+			canvas.style.display = 'block';
+			tileCanvas.style.display = 'none';
+			canvasOverlay.style.display = 'block';
+			canvasOverlay.style.backgroundImage = 'none';
+			overlayToggleBtn.textContent = 'Overlay: Off';
+		}
+
+		function getCanvasPoint(event) {
+			const currentFrame = getCurrentFrame();
+			const frameWidth = currentFrame.width;
+			const frameHeight = currentFrame.height;
+			const activeCanvas = overlayMode === 'tiling' ? tileCanvas : canvas;
+			const paintWidth = overlayMode === 'tiling' ? frameWidth * 3 : frameWidth;
+			const paintHeight = overlayMode === 'tiling' ? frameHeight * 3 : frameHeight;
+			const rect = activeCanvas.getBoundingClientRect();
+			const scaleX = paintWidth / rect.width;
+			const scaleY = paintHeight / rect.height;
+			return {
+				x: clamp(Math.floor((event.clientX - rect.left) * scaleX), 0, paintWidth - 1),
+				y: clamp(Math.floor((event.clientY - rect.top) * scaleY), 0, paintHeight - 1)
+			};
+		}
+
+		function paintPixel(x, y) {
+			const currentFrame = getCurrentFrame();
+			const frameWidth = currentFrame.width;
+			const frameHeight = currentFrame.height;
+			const baseX = ((x % frameWidth) + frameWidth) % frameWidth;
+			const baseY = ((y % frameHeight) + frameHeight) % frameHeight;
+			currentFrame.pixels[baseY * frameWidth + baseX] = {
+				r: activeColor.r,
+				g: activeColor.g,
+				b: activeColor.b,
+				a: activeColor.a
+			};
+		}
+
+		function paintLine(fromPoint, toPoint) {
+			let x0 = fromPoint.x;
+			let y0 = fromPoint.y;
+			const x1 = toPoint.x;
+			const y1 = toPoint.y;
+			const dx = Math.abs(x1 - x0);
+			const dy = Math.abs(y1 - y0);
+			const sx = x0 < x1 ? 1 : -1;
+			const sy = y0 < y1 ? 1 : -1;
+			let err = dx - dy;
+
+			while (true) {
+				paintPixel(x0, y0);
+				if (x0 === x1 && y0 === y1) break;
+				const e2 = err * 2;
+				if (e2 > -dy) {
+					err -= dy;
+					x0 += sx;
+				}
+				if (e2 < dx) {
+					err += dx;
+					y0 += sy;
+				}
+			}
+		}
+
+		function floodFill(startX, startY) {
+			const currentFrame = getCurrentFrame();
+			const frameWidth = currentFrame.width;
+			const frameHeight = currentFrame.height;
+			const baseStartX = ((startX % frameWidth) + frameWidth) % frameWidth;
+			const baseStartY = ((startY % frameHeight) + frameHeight) % frameHeight;
+			const startIndex = baseStartY * frameWidth + baseStartX;
+			const targetColor = { ...currentFrame.pixels[startIndex] };
+			const replacementColor = {
+				r: activeColor.r,
+				g: activeColor.g,
+				b: activeColor.b,
+				a: activeColor.a
+			};
+
+			if (colorsEqual(targetColor, replacementColor)) {
+				return;
+			}
+
+			const stack = [[baseStartX, baseStartY]];
+			while (stack.length) {
+				const [x, y] = stack.pop();
+				const index = y * frameWidth + x;
+				if (!colorsEqual(currentFrame.pixels[index], targetColor)) {
+					continue;
+				}
+
+				currentFrame.pixels[index] = { ...replacementColor };
+
+				if (x > 0) stack.push([x - 1, y]);
+				if (x < frameWidth - 1) stack.push([x + 1, y]);
+				if (y > 0) stack.push([x, y - 1]);
+				if (y < frameHeight - 1) stack.push([x, y + 1]);
+			}
+		}
+
+		function paintAt(event) {
+			const point = getCanvasPoint(event);
+			if (brushType.value === 'picker') {
+				const currentFrame = getCurrentFrame();
+				const frameWidth = currentFrame.width;
+				const frameHeight = currentFrame.height;
+				const baseX = ((point.x % frameWidth) + frameWidth) % frameWidth;
+				const baseY = ((point.y % frameHeight) + frameHeight) % frameHeight;
+				const picked = currentFrame.pixels[baseY * frameWidth + baseX];
+				setBrushColor(picked);
+				lastPaintPoint = point;
+				return;
+			}
+
+			if (brushType.value === 'fill') {
+				floodFill(point.x, point.y);
+				lastPaintPoint = point;
+				renderCanvas();
+				return;
+			}
+
+			if (lastPaintPoint) {
+				paintLine(lastPaintPoint, point);
+			} else {
+				paintPixel(point.x, point.y);
+			}
+			lastPaintPoint = point;
+
+			renderCanvas();
+		}
+
+		function beginStroke(event) {
+			isPainting = true;
+			lastPaintPoint = null;
+			strokeSnapshot = clonePixels(getCurrentFrame().pixels);
+			paintAt(event);
+
+			if (brushType.value === 'fill' || brushType.value === 'picker') {
+				endStroke();
+			}
+		}
+
+		function endStroke() {
+			if (!isPainting) return;
+			isPainting = false;
+			lastPaintPoint = null;
+			const frameChanged = strokeSnapshot && hasPixelDifferences(strokeSnapshot, getCurrentFrame().pixels);
+
+			if (frameChanged) {
+				undoStack.push({
+					frameIndex: activeFrameIndex,
+					snapshot: strokeSnapshot
+				});
+				if (undoStack.length > MAX_UNDO_STEPS) {
+					undoStack.shift();
+				}
+			}
+
+			strokeSnapshot = null;
+			if (frameChanged) {
+				renderFrames();
+			}
+		}
+
+		function undoLastStroke() {
+			const previous = undoStack.pop();
+			if (!previous) return;
+			if (!frames[previous.frameIndex]) return;
+			for (let i = 0; i < frames[previous.frameIndex].pixels.length; i++) {
+				frames[previous.frameIndex].pixels[i] = { ...previous.snapshot[i] };
+			}
+			if (activeFrameIndex !== previous.frameIndex) {
+				activeFrameIndex = previous.frameIndex;
+				renderFrames();
+			}
+			renderCanvas();
+			renderFrames();
+		}
+
+		function shiftCurrentFrame(dx, dy) {
+			const currentFrame = getCurrentFrame();
+			const snapshot = clonePixels(currentFrame.pixels);
+			const frameWidth = currentFrame.width;
+			const frameHeight = currentFrame.height;
+			const shifted = createEmptyPixels(frameWidth, frameHeight);
+
+			for (let y = 0; y < frameHeight; y++) {
+				for (let x = 0; x < frameWidth; x++) {
+					const sourceX = (x - dx + frameWidth) % frameWidth;
+					const sourceY = (y - dy + frameHeight) % frameHeight;
+					shifted[y * frameWidth + x] = { ...snapshot[sourceY * frameWidth + sourceX] };
+				}
+			}
+
+			currentFrame.pixels = shifted;
+			undoStack.push({
+				frameIndex: activeFrameIndex,
+				snapshot
+			});
+			if (undoStack.length > MAX_UNDO_STEPS) {
+				undoStack.shift();
+			}
+
+			renderCanvas();
+			renderFrames();
+		}
+
+		function exportImage() {
+			const scale = clamp(Math.floor(Number(exportScale.value) || 1), 1, 128);
+			const currentFrame = getCurrentFrame();
+			const frameWidth = currentFrame.width;
+			const frameHeight = currentFrame.height;
+			const temp = document.createElement('canvas');
+			temp.width = frameWidth * scale;
+			temp.height = frameHeight * scale;
+			const tempCtx = temp.getContext('2d', { alpha: true });
+			tempCtx.imageSmoothingEnabled = false;
+			tempCtx.clearRect(0, 0, temp.width, temp.height);
+			const currentPixels = currentFrame.pixels;
+
+			if (exportFormat.value === 'jpeg') {
+				tempCtx.fillStyle = '#ffffff';
+				tempCtx.fillRect(0, 0, temp.width, temp.height);
+			}
+
+			for (let y = 0; y < frameHeight; y++) {
+				for (let x = 0; x < frameWidth; x++) {
+					const color = currentPixels[y * frameWidth + x];
+					if (color.a <= 0) continue;
+					tempCtx.fillStyle = colorToCss(color);
+					tempCtx.fillRect(x * scale, y * scale, scale, scale);
+				}
+			}
+
+			const mime = exportFormat.value === 'jpeg' ? 'image/jpeg' : 'image/png';
+			const dataUrl = temp.toDataURL(mime, 0.95);
+			const link = document.createElement('a');
+			link.href = dataUrl;
+			const safeName = getCurrentFrame().name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'frame';
+			link.download = `${safeName}-${frameWidth}x${frameHeight}-x${scale}.${exportFormat.value === 'jpeg' ? 'jpg' : 'png'}`;
+			link.click();
+		}
+
+		function renderFramePreview(canvasEl, frame) {
+			const frameWidth = frame.width;
+			const frameHeight = frame.height;
+			if (canvasEl.width !== frameWidth || canvasEl.height !== frameHeight) {
+				canvasEl.width = frameWidth;
+				canvasEl.height = frameHeight;
+			}
+			const previewCtx = canvasEl.getContext('2d', { alpha: true });
+			previewCtx.clearRect(0, 0, frameWidth, frameHeight);
+			previewCtx.imageSmoothingEnabled = false;
+			for (let y = 0; y < frameHeight; y++) {
+				for (let x = 0; x < frameWidth; x++) {
+					const color = frame.pixels[y * frameWidth + x];
+					if (color.a <= 0) continue;
+					previewCtx.fillStyle = colorToCss(color);
+					previewCtx.fillRect(x, y, 1, 1);
+				}
+			}
+		}
+
+		function renderFrames() {
+			frameList.innerHTML = '';
+			const currentFrame = getCurrentFrame();
+			frameWidthInput.value = currentFrame.width;
+			frameHeightInput.value = currentFrame.height;
+
+			frames.forEach((frame, index) => {
+				const button = document.createElement('button');
+				button.className = 'frame-card';
+				if (index === activeFrameIndex) {
+					button.classList.add('active');
+				}
+
+				const preview = document.createElement('canvas');
+				preview.className = 'frame-preview';
+				preview.width = frame.width;
+				preview.height = frame.height;
+
+				const name = document.createElement('div');
+				name.className = 'frame-name';
+				name.textContent = frame.name;
+
+				const meta = document.createElement('div');
+				meta.className = 'small';
+				meta.textContent = `Frame ${index + 1} • ${frame.width}x${frame.height}`;
+
+				button.append(preview, name, meta);
+				button.addEventListener('click', () => {
+					activeFrameIndex = index;
+					renderFrames();
+					renderCanvas();
+				});
+
+				frameList.appendChild(button);
+				renderFramePreview(preview, frame);
+			});
+		}
+
+		function addFrame() {
+			const width = clamp(Math.floor(Number(frameWidthInput.value) || DEFAULT_SIZE), 1, 256);
+			const height = clamp(Math.floor(Number(frameHeightInput.value) || DEFAULT_SIZE), 1, 256);
+			frames.push(createFrame(`Frame ${frames.length + 1}`, createEmptyPixels(width, height), width, height));
+			activeFrameIndex = frames.length - 1;
+			renderFrames();
+			renderCanvas();
+		}
+
+		function duplicateFrame() {
+			const currentFrame = getCurrentFrame();
+			frames.push(createFrame(`${currentFrame.name} Copy`, currentFrame.pixels, currentFrame.width, currentFrame.height));
+			activeFrameIndex = frames.length - 1;
+			renderFrames();
+			renderCanvas();
+		}
+
+		function importFrameFromImage(file) {
+			const reader = new FileReader();
+			reader.onload = () => {
+				const image = new Image();
+				image.onload = () => {
+					const width = clamp(Math.floor(image.width), 1, 256);
+					const height = clamp(Math.floor(image.height), 1, 256);
+					const tempCanvas = document.createElement('canvas');
+					tempCanvas.width = width;
+					tempCanvas.height = height;
+					const tempCtx = tempCanvas.getContext('2d', { alpha: true });
+					tempCtx.imageSmoothingEnabled = false;
+					tempCtx.clearRect(0, 0, width, height);
+					tempCtx.drawImage(image, 0, 0, width, height);
+					const imageData = tempCtx.getImageData(0, 0, width, height).data;
+					const pixels = createEmptyPixels(width, height);
+
+					for (let i = 0; i < pixels.length; i++) {
+						const index = i * 4;
+						pixels[i] = {
+							r: imageData[index],
+							g: imageData[index + 1],
+							b: imageData[index + 2],
+							a: Number((imageData[index + 3] / 255).toFixed(3))
+						};
+					}
+
+					const baseName = (file.name || 'Imported').replace(/\.[^.]+$/, '');
+					frames.push(createFrame(`${baseName}`, pixels, width, height));
+					activeFrameIndex = frames.length - 1;
+					frameWidthInput.value = width;
+					frameHeightInput.value = height;
+					renderFrames();
+					renderCanvas();
+				};
+				image.onerror = () => {
+					alert('Could not load image for frame import.');
+				};
+				image.src = reader.result;
+			};
+			reader.readAsDataURL(file);
+		}
+
+		function deleteFrame() {
+			if (frames.length <= 1) return;
+			const deletedIndex = activeFrameIndex;
+			frames.splice(deletedIndex, 1);
+			activeFrameIndex = clamp(activeFrameIndex, 0, frames.length - 1);
+			for (let i = undoStack.length - 1; i >= 0; i--) {
+				if (undoStack[i].frameIndex === deletedIndex) {
+					undoStack.splice(i, 1);
+					continue;
+				}
+
+				if (undoStack[i].frameIndex > deletedIndex) {
+					undoStack[i].frameIndex -= 1;
+				}
+			}
+			renderFrames();
+			renderCanvas();
+		}
+
+		function exportProjectData() {
+			const project = {
+				version: 1,
+				defaultSize: DEFAULT_SIZE,
+				activeFrameIndex,
+				palettes,
+				frames: frames.map((frame) => ({
+					id: frame.id,
+					name: frame.name,
+					width: frame.width,
+					height: frame.height,
+					pixels: frame.pixels
+				}))
+			};
+
+			const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			link.download = 'qixel-project.json';
+			link.click();
+			URL.revokeObjectURL(url);
+		}
+
+		function importProjectData(file) {
+			const reader = new FileReader();
+			reader.onload = () => {
+				try {
+					const data = JSON.parse(reader.result);
+					if (!Array.isArray(data.frames) || !Array.isArray(data.palettes)) {
+						throw new Error('Invalid project file');
+					}
+
+					const importDefaultSize = clamp(Math.floor(Number(data.defaultSize ?? data.size ?? DEFAULT_SIZE)), 1, 256);
+
+					frames = data.frames.length
+						? data.frames.map((frame, index) => {
+							const width = clamp(Math.floor(Number(frame.width) || importDefaultSize), 1, 256);
+							const height = clamp(Math.floor(Number(frame.height) || importDefaultSize), 1, 256);
+							return createFrame(
+								frame.name || `Frame ${index + 1}`,
+								frame.pixels || createEmptyPixels(width, height),
+								width,
+								height
+							);
+						})
+						: [createFrame('Frame 1', createEmptyPixels(DEFAULT_SIZE, DEFAULT_SIZE), DEFAULT_SIZE, DEFAULT_SIZE)];
+
+					palettes = data.palettes.map((palette, index) => ({
+						id: palette.id || `${Date.now()}-${index}`,
+						name: palette.name || `Palette ${index + 1}`,
+						alpha: clamp(Number(palette.alpha ?? 1), 0, 1),
+						pageIndex: clamp(Number(palette.pageIndex ?? 0), 0, Math.max(0, (palette.saturationPages || [100]).length - 1)),
+						baseH: Number(palette.baseH ?? 210),
+						baseS: clamp(Number(palette.baseS ?? ((palette.saturationPages || [70])[0] ?? 70)), 0, 100),
+						baseL: clamp(Number(palette.baseL ?? 50), 0, 100),
+						luminositySteps: Math.max(0, Math.floor(Number(palette.luminositySteps ?? 1))),
+						saturationSteps: Math.max(0, Math.floor(Number(palette.saturationSteps ?? Math.max(0, (palette.saturationPages || [70]).length - 1)))),
+						bendTargets: {
+							light: {
+								r: clamp(Number(palette.bendTargets?.light?.r ?? 255), 0, 255),
+								g: clamp(Number(palette.bendTargets?.light?.g ?? 255), 0, 255),
+								b: clamp(Number(palette.bendTargets?.light?.b ?? 255), 0, 255)
+							},
+							dark: {
+								r: clamp(Number(palette.bendTargets?.dark?.r ?? 0), 0, 255),
+								g: clamp(Number(palette.bendTargets?.dark?.g ?? 0), 0, 255),
+								b: clamp(Number(palette.bendTargets?.dark?.b ?? 0), 0, 255)
+							},
+							sat: {
+								r: clamp(Number(palette.bendTargets?.sat?.r ?? 128), 0, 255),
+								g: clamp(Number(palette.bendTargets?.sat?.g ?? 128), 0, 255),
+								b: clamp(Number(palette.bendTargets?.sat?.b ?? 128), 0, 255)
+							}
+						},
+						config: palette.config || {
+							baseMode: 'hsl',
+							baseInputs: {
+								h: Number(palette.baseH ?? 210),
+								s: clamp(Number(palette.baseS ?? 70), 0, 100),
+								l: clamp(Number(palette.baseL ?? 50), 0, 100),
+								r: 64,
+								g: 128,
+								b: 224,
+								a: clamp(Number(palette.alpha ?? 1), 0, 1)
+							},
+							angle: 30,
+							leftIterations: 2,
+							rightIterations: 2,
+							luminositySteps: Math.max(0, Math.floor(Number(palette.luminositySteps ?? 1))),
+							saturationSteps: Math.max(0, Math.floor(Number(palette.saturationSteps ?? Math.max(0, (palette.saturationPages || [70]).length - 1)))),
+							bendInputs: {
+								mode: 'hsl',
+								light: { h: 0, s: 0, l: 100 },
+								dark: { h: 0, s: 0, l: 0 },
+								sat: { h: 0, s: 0, l: 50 }
+							}
+						},
+						hueColumns: Array.isArray(palette.hueColumns) ? palette.hueColumns : [210],
+						lightnessRows: Array.isArray(palette.lightnessRows) ? palette.lightnessRows : [50],
+						saturationPages: Array.isArray(palette.saturationPages) && palette.saturationPages.length ? palette.saturationPages : [70]
+					}));
+
+					activeFrameIndex = clamp(Number(data.activeFrameIndex ?? 0), 0, frames.length - 1);
+					selectedPaletteId = palettes[0]?.id || null;
+					undoStack.length = 0;
+					renderFrames();
+					renderPalettes();
+					renderCanvas();
+				} catch (error) {
+					alert('Could not import project info.');
+				}
+			};
+
+			reader.readAsText(file);
+		}
+
+		function generateHueColumns(baseHue, angle, leftIterations, rightIterations) {
+			const columns = [];
+			for (let i = leftIterations; i >= 1; i--) {
+				columns.push(modHue(baseHue - i * angle));
+			}
+			columns.push(modHue(baseHue));
+			for (let i = 1; i <= rightIterations; i++) {
+				columns.push(modHue(baseHue + i * angle));
+			}
+			return columns;
+		}
+
+		function generateLightnessRows(baseLightness, luminositySteps) {
+			const rows = [];
+
+			for (let i = luminositySteps; i >= 1; i--) {
+				const ratio = i / (luminositySteps + 1);
+				rows.push(baseLightness + (100 - baseLightness) * ratio);
+			}
+
+			rows.push(baseLightness);
+
+			for (let i = 1; i <= luminositySteps; i++) {
+				const ratio = i / (luminositySteps + 1);
+				rows.push(baseLightness * (1 - ratio));
+			}
+
+			return rows.map((n) => clamp(n, 0, 100));
+		}
+
+		function generateSaturationPages(baseSaturation, saturationSteps) {
+			const pages = [baseSaturation];
+			for (let i = 1; i <= saturationSteps; i++) {
+				const ratio = i / (saturationSteps + 1);
+				pages.push(baseSaturation * (1 - ratio));
+			}
+			return pages.map((n) => clamp(n, 0, 100));
+		}
+
+		function getBendInputsFromForm() {
+			if (bendMode.value === 'hsl') {
+				return {
+					mode: 'hsl',
+					light: {
+						h: modHue(Number(bendLightH.value)),
+						s: clamp(Number(bendLightS.value), 0, 100),
+						l: clamp(Number(bendLightL.value), 0, 100)
+					},
+					dark: {
+						h: modHue(Number(bendDarkH.value)),
+						s: clamp(Number(bendDarkS.value), 0, 100),
+						l: clamp(Number(bendDarkL.value), 0, 100)
+					},
+					sat: {
+						h: modHue(Number(bendSatH.value)),
+						s: clamp(Number(bendSatS.value), 0, 100),
+						l: clamp(Number(bendSatL.value), 0, 100)
+					}
+				};
+			}
+
+			return {
+				mode: 'rgb',
+				light: {
+					r: clamp(Number(bendLightR.value), 0, 255),
+					g: clamp(Number(bendLightG.value), 0, 255),
+					b: clamp(Number(bendLightB.value), 0, 255)
+				},
+				dark: {
+					r: clamp(Number(bendDarkR.value), 0, 255),
+					g: clamp(Number(bendDarkG.value), 0, 255),
+					b: clamp(Number(bendDarkB.value), 0, 255)
+				},
+				sat: {
+					r: clamp(Number(bendSatR.value), 0, 255),
+					g: clamp(Number(bendSatG.value), 0, 255),
+					b: clamp(Number(bendSatB.value), 0, 255)
+				}
+			};
+		}
+
+		function resolveBendTargets(bendInputs) {
+			if (bendInputs.mode === 'hsl') {
+				return {
+					light: hslToRgb(bendInputs.light.h, bendInputs.light.s, bendInputs.light.l),
+					dark: hslToRgb(bendInputs.dark.h, bendInputs.dark.s, bendInputs.dark.l),
+					sat: hslToRgb(bendInputs.sat.h, bendInputs.sat.s, bendInputs.sat.l)
+				};
+			}
+
+			return {
+				light: { ...bendInputs.light },
+				dark: { ...bendInputs.dark },
+				sat: { ...bendInputs.sat }
+			};
+		}
+
+		function setBendInputsToDefaults() {
+			bendMode.value = 'hsl';
+			bendLightH.value = 0;
+			bendLightS.value = 0;
+			bendLightL.value = 100;
+			bendDarkH.value = 0;
+			bendDarkS.value = 0;
+			bendDarkL.value = 0;
+			bendSatH.value = 0;
+			bendSatS.value = 0;
+			bendSatL.value = 50;
+
+			bendLightR.value = 255;
+			bendLightG.value = 255;
+			bendLightB.value = 255;
+			bendDarkR.value = 0;
+			bendDarkG.value = 0;
+			bendDarkB.value = 0;
+			bendSatR.value = 128;
+			bendSatG.value = 128;
+			bendSatB.value = 128;
+		}
+
+		function buildPaletteFromForm() {
+			let base;
+			if (baseMode.value === 'hsl') {
+				base = {
+					h: modHue(Number(baseH.value)),
+					s: clamp(Number(baseS.value), 0, 100),
+					l: clamp(Number(baseL.value), 0, 100),
+					a: clamp(Number(baseA.value), 0, 1)
+				};
+			} else {
+				const rgb = {
+					r: clamp(Number(baseR.value), 0, 255),
+					g: clamp(Number(baseG.value), 0, 255),
+					b: clamp(Number(baseB.value), 0, 255)
+				};
+				const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
+				base = {
+					h: hsl.h,
+					s: hsl.s,
+					l: hsl.l,
+					a: clamp(Number(baseA.value), 0, 1)
+				};
+			}
+
+			const leftIterations = Math.max(0, Math.floor(Number(leftIterationsInput.value)));
+			const rightIterations = Math.max(0, Math.floor(Number(rightIterationsInput.value)));
+			const luminositySteps = Math.max(0, Math.floor(Number(luminosityStepsInput.value)));
+			const saturationSteps = Math.max(0, Math.floor(Number(saturationStepsInput.value)));
+			const angle = modHue(Number(angleInput.value));
+
+			const hueColumns = generateHueColumns(base.h, angle, leftIterations, rightIterations);
+			const lightnessRows = generateLightnessRows(base.l, luminositySteps);
+			const saturationPages = generateSaturationPages(base.s, saturationSteps);
+			const bendInputs = getBendInputsFromForm();
+			const bendTargets = resolveBendTargets(bendInputs);
+
+			return {
+				id: editingPaletteId || `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+				name: paletteName.value.trim() || `Palette ${palettes.length + 1}`,
+				alpha: base.a,
+				pageIndex: 0,
+				baseH: base.h,
+				baseS: base.s,
+				baseL: base.l,
+				luminositySteps,
+				saturationSteps,
+				bendTargets,
+				config: {
+					baseMode: baseMode.value,
+					baseInputs: {
+						h: Number(baseH.value),
+						s: Number(baseS.value),
+						l: Number(baseL.value),
+						r: Number(baseR.value),
+						g: Number(baseG.value),
+						b: Number(baseB.value),
+						a: Number(baseA.value)
+					},
+					angle,
+					leftIterations,
+					rightIterations,
+					luminositySteps,
+					saturationSteps,
+					bendInputs
+				},
+				hueColumns,
+				lightnessRows,
+				saturationPages
+			};
+		}
+
+		function paletteColor(palette, row, col, pageIndex) {
+			const hue = palette.hueColumns[col];
+			const luminositySteps = palette.luminositySteps ?? Math.floor((palette.lightnessRows.length - 1) / 2);
+			const saturationSteps = palette.saturationSteps ?? Math.max(0, palette.saturationPages.length - 1);
+			const baseS = palette.baseS ?? palette.saturationPages[0] ?? 70;
+			const baseL = palette.baseL ?? palette.lightnessRows[luminositySteps] ?? 50;
+			const bendTargets = palette.bendTargets || {
+				light: { r: 255, g: 255, b: 255 },
+				dark: { r: 0, g: 0, b: 0 },
+				sat: { r: 128, g: 128, b: 128 }
+			};
+
+			let rgb = hslToRgb(hue, baseS, baseL);
+
+			if (row < luminositySteps) {
+				const ratio = (luminositySteps - row) / (luminositySteps + 1);
+				rgb = blendRgb(rgb, bendTargets.light, ratio);
+			} else if (row > luminositySteps) {
+				const ratio = (row - luminositySteps) / (luminositySteps + 1);
+				rgb = blendRgb(rgb, bendTargets.dark, ratio);
+			}
+
+			if (saturationSteps > 0 && pageIndex > 0) {
+				const ratio = pageIndex / (saturationSteps + 1);
+				rgb = blendRgb(rgb, bendTargets.sat, ratio);
+			}
+
+			return { ...rgb, a: palette.alpha };
+		}
+
+		function getSelectedPalette() {
+			return palettes.find((palette) => palette.id === selectedPaletteId) || null;
+		}
+
+		function loadPaletteIntoForm(palette) {
+			const config = palette.config || {
+				baseMode: 'hsl',
+				baseInputs: {
+					h: palette.baseH ?? palette.hueColumns[Math.floor(palette.hueColumns.length / 2)] ?? 210,
+					s: palette.baseS ?? palette.saturationPages[0] ?? 70,
+					l: palette.baseL ?? palette.lightnessRows[Math.floor(palette.lightnessRows.length / 2)] ?? 50,
+					r: 64,
+					g: 128,
+					b: 224,
+					a: palette.alpha ?? 1
+				},
+				angle: 30,
+				leftIterations: Math.floor((palette.hueColumns.length - 1) / 2),
+				rightIterations: Math.floor((palette.hueColumns.length - 1) / 2),
+				luminositySteps: palette.luminositySteps ?? Math.floor((palette.lightnessRows.length - 1) / 2),
+				saturationSteps: palette.saturationSteps ?? Math.max(0, palette.saturationPages.length - 1),
+				bendInputs: {
+					mode: 'hsl',
+					light: { h: 0, s: 0, l: 100 },
+					dark: { h: 0, s: 0, l: 0 },
+					sat: { h: 0, s: 0, l: 50 }
+				}
+			};
+
+			paletteName.value = palette.name;
+			baseMode.value = config.baseMode || 'hsl';
+			baseH.value = config.baseInputs.h ?? 210;
+			baseS.value = config.baseInputs.s ?? 70;
+			baseL.value = config.baseInputs.l ?? 50;
+			baseR.value = config.baseInputs.r ?? 64;
+			baseG.value = config.baseInputs.g ?? 128;
+			baseB.value = config.baseInputs.b ?? 224;
+			baseA.value = config.baseInputs.a ?? 1;
+
+			angleInput.value = config.angle ?? 30;
+			leftIterationsInput.value = config.leftIterations ?? 2;
+			rightIterationsInput.value = config.rightIterations ?? 2;
+			luminosityStepsInput.value = config.luminositySteps ?? 1;
+			saturationStepsInput.value = config.saturationSteps ?? 1;
+
+			setBendInputsToDefaults();
+			const bendInputs = config.bendInputs || { mode: 'hsl', light: { h: 0, s: 0, l: 100 }, dark: { h: 0, s: 0, l: 0 }, sat: { h: 0, s: 0, l: 50 } };
+			bendMode.value = bendInputs.mode || 'hsl';
+			if (bendMode.value === 'hsl') {
+				bendLightH.value = bendInputs.light?.h ?? 0;
+				bendLightS.value = bendInputs.light?.s ?? 0;
+				bendLightL.value = bendInputs.light?.l ?? 100;
+				bendDarkH.value = bendInputs.dark?.h ?? 0;
+				bendDarkS.value = bendInputs.dark?.s ?? 0;
+				bendDarkL.value = bendInputs.dark?.l ?? 0;
+				bendSatH.value = bendInputs.sat?.h ?? 0;
+				bendSatS.value = bendInputs.sat?.s ?? 0;
+				bendSatL.value = bendInputs.sat?.l ?? 50;
+			} else {
+				bendLightR.value = bendInputs.light?.r ?? 255;
+				bendLightG.value = bendInputs.light?.g ?? 255;
+				bendLightB.value = bendInputs.light?.b ?? 255;
+				bendDarkR.value = bendInputs.dark?.r ?? 0;
+				bendDarkG.value = bendInputs.dark?.g ?? 0;
+				bendDarkB.value = bendInputs.dark?.b ?? 0;
+				bendSatR.value = bendInputs.sat?.r ?? 128;
+				bendSatG.value = bendInputs.sat?.g ?? 128;
+				bendSatB.value = bendInputs.sat?.b ?? 128;
+			}
+
+			setModeVisibility(baseMode, baseHslInputs, baseRgbInputs);
+			setModeVisibility(bendMode, bendHslInputs, bendRgbInputs, 'grid', 'grid');
+		}
+
+		function renderPalettes() {
+			if (!palettes.some((palette) => palette.id === selectedPaletteId)) {
+				selectedPaletteId = palettes[0]?.id || null;
+			}
+
+			paletteList.innerHTML = '';
+
+			palettes.forEach((palette) => {
+				const card = document.createElement('div');
+				card.className = 'palette-card';
+				if (palette.id === selectedPaletteId) {
+					card.classList.add('selected');
+				}
+				const totalCells = palette.hueColumns.length * palette.lightnessRows.length;
+				if (totalCells <= 20) {
+					card.classList.add('compact');
+				}
+
+				const header = document.createElement('div');
+				header.className = 'palette-header';
+
+				const nameEl = document.createElement('p');
+				nameEl.className = 'palette-name';
+				nameEl.textContent = palette.name;
+
+				const satText = document.createElement('span');
+				satText.className = 'small';
+				satText.textContent = `Saturation ${palette.pageIndex + 1}/${palette.saturationPages.length}`;
+
+				header.append(nameEl, satText);
+
+				const grid = document.createElement('div');
+				grid.className = 'palette-grid';
+				grid.style.gridTemplateColumns = `repeat(${palette.hueColumns.length}, minmax(0, 1fr))`;
+				grid.style.justifySelf = totalCells <= 20 ? 'start' : 'stretch';
+
+				for (let row = 0; row < palette.lightnessRows.length; row++) {
+					for (let col = 0; col < palette.hueColumns.length; col++) {
+						const color = paletteColor(palette, row, col, palette.pageIndex);
+
+						const swatch = document.createElement('button');
+						swatch.className = 'swatch';
+
+						if (
+							activeColor.r === color.r &&
+							activeColor.g === color.g &&
+							activeColor.b === color.b &&
+							Math.abs(activeColor.a - color.a) < 0.001
+						) {
+							swatch.classList.add('active');
+						}
+
+						const overlay = document.createElement('span');
+						overlay.style.background = colorToCss(color);
+						swatch.appendChild(overlay);
+
+						swatch.addEventListener('click', (event) => {
+							event.stopPropagation();
+							selectedPaletteId = palette.id;
+							setBrushColor(color);
+							renderPalettes();
+						});
+						grid.appendChild(swatch);
+					}
+				}
+
+				const pager = document.createElement('div');
+				pager.className = 'pagination';
+
+				const prev = document.createElement('button');
+				prev.textContent = '←';
+				prev.disabled = palette.pageIndex <= 0;
+				prev.addEventListener('click', () => {
+					palette.pageIndex = Math.max(0, palette.pageIndex - 1);
+					renderPalettes();
+				});
+
+				const pageLabel = document.createElement('span');
+				pageLabel.textContent = `${palette.pageIndex + 1}/${palette.saturationPages.length}`;
+
+				const next = document.createElement('button');
+				next.textContent = '→';
+				next.disabled = palette.pageIndex >= palette.saturationPages.length - 1;
+				next.addEventListener('click', () => {
+					palette.pageIndex = Math.min(palette.saturationPages.length - 1, palette.pageIndex + 1);
+					renderPalettes();
+				});
+
+				pager.append(prev, pageLabel, next);
+				card.append(header, grid, pager);
+				card.addEventListener('click', () => {
+					selectedPaletteId = palette.id;
+					renderPalettes();
+				});
+				paletteList.appendChild(card);
+			});
+
+			renderCanvas();
+		}
+
+		function openPaletteModal() {
+			editingPaletteId = null;
+			createPaletteBtn.textContent = 'Create palette';
+			setBendInputsToDefaults();
+			setModeVisibility(bendMode, bendHslInputs, bendRgbInputs, 'grid', 'grid');
+			paletteModal.classList.add('show');
+		}
+
+		function openPaletteEditModal() {
+			const palette = getSelectedPalette();
+			if (!palette) {
+				alert('Select a palette to edit.');
+				return;
+			}
+
+			editingPaletteId = palette.id;
+			createPaletteBtn.textContent = 'Save palette';
+			loadPaletteIntoForm(palette);
+			paletteModal.classList.add('show');
+		}
+
+		function deleteSelectedPalette() {
+			if (!selectedPaletteId) return;
+			palettes = palettes.filter((palette) => palette.id !== selectedPaletteId);
+			selectedPaletteId = palettes[0]?.id || null;
+			renderPalettes();
+		}
+
+		function closePaletteModal() {
+			editingPaletteId = null;
+			createPaletteBtn.textContent = 'Create palette';
+			paletteModal.classList.remove('show');
+		}
+
+		brushMode.addEventListener('change', () => {
+			setModeVisibility(brushMode, brushHslInputs, brushRgbInputs);
+			syncBrushFromMode();
+		});
+
+		[brushH, brushS, brushL, brushR, brushG, brushB, brushA].forEach((input) => {
+			input.addEventListener('input', syncBrushFromMode);
+		});
+
+		function attachPaintEvents(targetCanvas) {
+			targetCanvas.addEventListener('mousedown', beginStroke);
+			targetCanvas.addEventListener('mousemove', (event) => {
+				if (!isPainting) return;
+				paintAt(event);
+			});
+			targetCanvas.addEventListener('mouseleave', () => {
+				lastPaintPoint = null;
+			});
+		}
+
+		attachPaintEvents(canvas);
+		attachPaintEvents(tileCanvas);
+
+		window.addEventListener('mouseup', endStroke);
+
+		window.addEventListener('keydown', (event) => {
+			if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') {
+				event.preventDefault();
+				undoLastStroke();
+			}
+		});
+
+		exportBtn.addEventListener('click', exportImage);
+		overlayToggleBtn.addEventListener('click', () => {
+			const modes = ['off', 'grid', 'guides', 'tiling'];
+			overlayMode = modes[(modes.indexOf(overlayMode) + 1) % modes.length];
+			updateOverlay();
+		});
+		highlightNotInAnyToggle.addEventListener('change', renderCanvas);
+		highlightNotInSelectedToggle.addEventListener('change', renderCanvas);
+
+		addFrameBtn.addEventListener('click', addFrame);
+		duplicateFrameBtn.addEventListener('click', duplicateFrame);
+		deleteFrameBtn.addEventListener('click', deleteFrame);
+		importFrameBtn.addEventListener('click', () => importFrameInput.click());
+		importFrameInput.addEventListener('change', (event) => {
+			const [file] = event.target.files;
+			if (file) importFrameFromImage(file);
+			importFrameInput.value = '';
+		});
+		[frameWidthInput, frameHeightInput].forEach((input) => {
+			input.addEventListener('change', () => {
+				input.value = clamp(Math.floor(Number(input.value) || DEFAULT_SIZE), 1, 256);
+			});
+		});
+		shiftUpBtn.addEventListener('click', () => shiftCurrentFrame(0, -1));
+		shiftDownBtn.addEventListener('click', () => shiftCurrentFrame(0, 1));
+		shiftLeftBtn.addEventListener('click', () => shiftCurrentFrame(-1, 0));
+		shiftRightBtn.addEventListener('click', () => shiftCurrentFrame(1, 0));
+
+		addPaletteBtn.addEventListener('click', openPaletteModal);
+		editPaletteBtn.addEventListener('click', openPaletteEditModal);
+		deletePaletteBtn.addEventListener('click', deleteSelectedPalette);
+		exportProjectBtn.addEventListener('click', exportProjectData);
+		importProjectBtn.addEventListener('click', () => importProjectInput.click());
+		importProjectInput.addEventListener('change', (event) => {
+			const [file] = event.target.files;
+			if (file) importProjectData(file);
+			importProjectInput.value = '';
+		});
+		cancelPaletteBtn.addEventListener('click', closePaletteModal);
+
+		baseMode.addEventListener('change', () => {
+			setModeVisibility(baseMode, baseHslInputs, baseRgbInputs);
+		});
+
+		bendMode.addEventListener('change', () => {
+			setModeVisibility(bendMode, bendHslInputs, bendRgbInputs, 'grid', 'grid');
+		});
+
+		createPaletteBtn.addEventListener('click', () => {
+			const palette = buildPaletteFromForm();
+			if (editingPaletteId) {
+				const index = palettes.findIndex((item) => item.id === editingPaletteId);
+				if (index >= 0) {
+					palette.pageIndex = palettes[index].pageIndex;
+					palettes[index] = palette;
+				} else {
+					palettes.push(palette);
+				}
+			} else {
+				palettes.push(palette);
+			}
+			selectedPaletteId = palette.id;
+			closePaletteModal();
+			renderPalettes();
+		});
+
+		paletteModal.addEventListener('click', (event) => {
+			if (event.target === paletteModal) closePaletteModal();
+		});
+
+		setModeVisibility(brushMode, brushHslInputs, brushRgbInputs);
+		setModeVisibility(baseMode, baseHslInputs, baseRgbInputs);
+		setModeVisibility(bendMode, bendHslInputs, bendRgbInputs, 'grid', 'grid');
+		updateOverlay();
+		setBrushColor(activeColor);
+		renderFrames();
+		renderCanvas();
+	</script>
+</body>
+</html>
